@@ -22,6 +22,7 @@ DEFENESTRATE history             Audit log of everything DEFENESTRATE did
 | **analyze** | Concurrent walk (16 workers), largest-children bar chart, ≥64 MB large-file list, `--json` output, `--delete` recycles via Recycle Bin |
 | **status** | Health-scored dashboard: CPU total + per-core bars, RAM, per-drive used/free/read/write rates; `--watch` for 1 s refresh |
 | **optimize** | Bounded maintenance tasks — DNS/ARP flush, Recycle Bin empty (gated), Search service restart, perf-counter rebuild — plus pending-reboot & uptime report. Admin tasks skip without elevation; never auto-elevates |
+| **shell** | Emit or install the **Defenestrate PowerShell module**: Invoke-DefClean / Get-DefStatus / Invoke-DefUninstall / Invoke-DefPurge as native cmdlets with object output (defenestrate shell --install)
 | **update** | Self-update from GitHub Releases: semver compare → download → atomic swap with rollback. Channel configured at build time via ldflags; unconfigured builds fail closed |
 
 ## The TUIs
@@ -93,7 +94,7 @@ Requires Go ≥ 1.22. Runtime deps: `bubbletea` (menu), `gopsutil` (monitor),
 MIT. Docs: [English](README.md) · [简体中文](docs/README.zh-CN.md)
 Agent surface: [docs/skills/DEFENESTRATE-cli/SKILL.md](docs/skills/DEFENESTRATE-cli/SKILL.md) ·
 Security: [SECURITY_DESIGN](docs/SECURITY_DESIGN.md) · [SECURITY_AUDIT](docs/SECURITY_AUDIT.md) ·
-Completion: dot-source `completion/DEFENESTRATE.ps1`
+PowerShell-first? DEFENESTRATE shell --install then Import-Module Defenestrate - real cmdlets, JSON->objects. Completion: dot-source `completion/DEFENESTRATE.ps1`
 
 ## Known limitations (v1)
 

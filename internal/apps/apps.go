@@ -12,11 +12,19 @@ import (
 	"sort"
 	"strings"
 
+	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
 
 	"github.com/iAMv1/defenestrate/internal/safety"
 	"github.com/iAMv1/defenestrate/internal/ui"
 )
+
+// IsElevated reports whether this process runs with an admin token. HKLM
+// evidence-key deletion requires it; without it those keys surface as
+// review-only lines instead (never silently skipped, never auto-elevated).
+func IsElevated() bool {
+	return windows.GetCurrentProcessToken().IsElevated()
+}
 
 // App is one installed program found in an Uninstall registry key.
 type App struct {
@@ -230,6 +238,29 @@ func uninstallOne(all []App, filter string, yes bool) error {
 			fmt.Println(ui.Check + " " + k)
 		}
 	}
+	// HKLM evidence keys: deleted only under elevation; otherwise the exact
+	// admin command is printed so nothing is silently dropped.
+	if len(sweep.HklmRegKeys) > 0 {
+		if safety.DryRun() {
+			for _, k := range sweep.HklmRegKeys {
+				safety.Logf("[dry-run] would delete machine regkey", k, 0)
+			}
+		} else if IsElevated() {
+			for _, k := range sweep.HklmRegKeys {
+				sub := strings.TrimPrefix(k, `HKLM\`)
+				if err := registry.DeleteKey(registry.LOCAL_MACHINE, sub); err == nil {
+					fmt.Println(ui.Check + " " + k)
+				} else {
+					fmt.Println(ui.Bad("  skip:", k, "-", err))
+				}
+			}
+		} else {
+			fmt.Println(ui.Warn("Machine-hive keys need an elevated shell (not auto-elevated):"))
+			for _, k := range sweep.HklmRegKeys {
+				fmt.Printf("       reg delete \"%s\" /f\n", k)
+			}
+		}
+	}
 	for _, s := range sweep.StartupShortcuts {
 		if err := safety.Recycle([]string{s}); err == nil {
 			fmt.Println(ui.Check + " " + s)
@@ -288,6 +319,16 @@ func printPlan(app *App, sweep SweepResult, lb int64) {
 			fmt.Println("       task: " + t)
 		}
 	}
+	if len(sweep.HklmRegKeys) > 0 {
+		tag := "deleted (elevated)"
+		if !IsElevated() {
+			tag = "needs elevated shell"
+		}
+		fmt.Printf("  5. Machine-hive registry keys (%s):\n", tag)
+		for _, k := range sweep.HklmRegKeys {
+			fmt.Println("       " + k)
+		}
+	}
 }
 
 // confirm asks a y/N question on stdin.
@@ -316,8 +357,11 @@ type SweepResult struct {
 	// contains an evidence identity. Recyclable post-uninstall.
 	StartupShortcuts []string
 	// Tasks: scheduled tasks whose name contains a distinctive token.
-	// Review-only — DEFENESTRATE never deletes tasks; use schtasks manually.
+	// Review-only — warden never deletes tasks; use schtasks manually.
 	Tasks []string
+	// HklmRegKeys: machine-hive uninstall keys whose evidence identity matches
+	// exactly. Deletion needs an elevated process; unelevated runs list them.
+	HklmRegKeys []string
 }
 
 // SweepLeftoversFor builds the sweep plan from one app's registry evidence.
@@ -358,6 +402,27 @@ func SweepLeftoversFor(app *App) SweepResult {
 			for _, k := range keys {
 				if strings.ToLower(k) == norm {
 					res.RegKeys = append(res.RegKeys, `HKCU\Software\`+k)
+				}
+			}
+		}
+	}
+
+	// Machine-hive twin (HKLM sweep): the app's own uninstall key plus any
+	// HKLM\SOFTWARE vendor key whose name matches the identity exactly.
+	// Deleting these needs elevation; unelevated runs surface them as
+	// review-only lines with the exact command instead of failing.
+	if strings.Contains(strings.ToLower(app.KeyPath), `microsoft\windows\currentversion\uninstall`) {
+		res.HklmRegKeys = append(res.HklmRegKeys, `HKLM\`+app.KeyPath)
+	}
+	hklm, err := registry.OpenKey(registry.LOCAL_MACHINE, `SOFTWARE`, registry.ENUMERATE_SUB_KEYS)
+	if err == nil {
+		keys, kerr := hklm.ReadSubKeyNames(-1)
+		hklm.Close()
+		if kerr == nil {
+			for _, k := range keys {
+				lk := strings.ToLower(k)
+				if lk == norm && !strings.Contains(lk, "microsoft") && !strings.Contains(lk, "windows") {
+					res.HklmRegKeys = append(res.HklmRegKeys, `HKLM\SOFTWARE\`+k)
 				}
 			}
 		}
@@ -532,9 +597,10 @@ func RunUninstallCommand(cmdline string) error { return runUninstaller(cmdline) 
 
 // RemoveAppx removes one Store package (exported for the TUI).
 func RemoveAppx(full string) error { return removeAppx(full) }
-//   - "C:\path\unins000.exe"                       (bare path)
-//   - "\"C:\path\unins000.exe\" /param"            (quoted exe + args)
-//   - "MsiExec.exe /I{GUID}"                       (MSI)
+
+// - "C:\path\unins000.exe"                       (bare path)
+// - "\"C:\path\unins000.exe\" /param"            (quoted exe + args)
+// - "MsiExec.exe /I{GUID}"                       (MSI)
 func runUninstaller(cmdline string) error {
 	cmdline = strings.TrimSpace(cmdline)
 	var exe string

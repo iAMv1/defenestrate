@@ -18,6 +18,7 @@ import (
 	"github.com/iAMv1/defenestrate/internal/optimize"
 	"github.com/iAMv1/defenestrate/internal/purge"
 	"github.com/iAMv1/defenestrate/internal/safety"
+	"github.com/iAMv1/defenestrate/internal/shell"
 	"github.com/iAMv1/defenestrate/internal/tui"
 	"github.com/iAMv1/defenestrate/internal/update"
 )
@@ -43,6 +44,7 @@ Usage:
   DEFENESTRATE optimize [--all] [--dry-run]
                              Bounded maintenance tasks (DNS, ARP, Recycle Bin)
   DEFENESTRATE purge [--all] [--dry-run] [--paths]
+  DEFENESTRATE shell [--install]        Emit/install the PowerShell module
                              Remove project build artifacts (node_modules, target…)
   DEFENESTRATE installer [--dry-run]
                              Find and remove leftover installers
@@ -109,8 +111,22 @@ func main() {
 		err = installer.Run(args)
 	case "purge":
 		err = purge.Run(args)
+	case "shell":
+		// Shell-first surface: emit or install the Defenestrate PowerShell module.
+		if hasFlag(args, "--install") {
+			p, ierr := shell.Install(version)
+			if ierr != nil {
+				err = ierr
+				break
+			}
+			fmt.Println("Module installed: " + p)
+			fmt.Println("Import it with:  Import-Module Defenestrate -Force")
+		} else {
+			shell.Print(version)
+		}
 	case "history":
-		if hasFlag(args, "--json") {			entries, jerr := safety.HistoryJSON()
+		if hasFlag(args, "--json") {
+			entries, jerr := safety.HistoryJSON()
 			if jerr != nil {
 				err = jerr
 				break
