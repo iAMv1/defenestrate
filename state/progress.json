@@ -1,0 +1,10 @@
+{"iteration": 21, "total_findings": 44, "status": "p1_lap_complete", "stale_count": 0,
+ "findings": [
+  "R16: purge mode — marker-evidence scoping (.git/package.json/go.mod/Cargo.toml/csproj...), 13 artifact types, recency hold (7d), live: 24 artifacts/1.9GB in Dev",
+  "R17: installer sweep — Downloads/Desktop/Temp, 50MB exe/msi/msix + 100MB archives; live: caught 150.9MB orphaned ProtonPass msix in Temp",
+  "R18: whitelist UX — add/remove/list persisted to %LOCALAPPDATA%/DEFENESTRATE/whitelist.txt; clean.Scan consults it (label or path-prefix match); verified skip end-to-end",
+  "R19: uninstall depth — startup-folder shortcut sweep (user+all-users), surfaced in plan+TUI transcript",
+  "R20: status depth — per-NIC down/up rates (slice-join fix for Windows gopsutil), lifetime>1MB filter, persistent prefs (core rows)",
+  "R21: ecosystem — SECURITY_AUDIT.md, agent SKILL.md surface, PowerShell completion; scan wall-clock budget (90s deadline + per-artifact dirBytes bound) after live 316s hang exposed unbounded walk"
+ ],
+ "validation": "vet=0; go test ok x5 pkgs; build=0 (8MB); purge bounded 75s; smoke matrix green"}
