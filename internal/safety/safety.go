@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/iAMv1/defenestrate/internal/pshost"
 )
 
 var (
@@ -115,8 +117,9 @@ allowed:
 	return nil
 }
 
-// Recycle moves paths to the Recycle Bin via PowerShell's FileSystem API.
-// One PowerShell process handles the whole batch. Dry-run short-circuits.
+// Recycle moves paths to the Recycle Bin via PowerShell's FileSystem API,
+// executed inside the PERSISTENT engine session (shell-first: no per-batch
+// ~450ms spawn; purge/uninstall issue many batches per run). Dry-run skips.
 func Recycle(paths []string) error {
 	var valid []string
 	for _, p := range paths {
@@ -137,13 +140,29 @@ func Recycle(paths []string) error {
 		}
 		return nil
 	}
-	script := "Add-Type -AssemblyName Microsoft.VisualBasic; " +
-		"foreach ($p in $args) { if (Test-Path -LiteralPath $p) { " +
-		"[Microsoft.VisualBasic.FileIO.FileSystem]::DeleteDirectory($p,'OnlyErrorDialogs','SendToRecycleBin') } }"
-	args := append([]string{"-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script}, valid...)
-	out, err := execPowershell(args)
+	// Literal single-quoted path list built with '' escaping (paths come from
+	// our own scan results, but never trust interpolation).
+	var sb strings.Builder
+	sb.WriteString("Add-Type -AssemblyName Microsoft.VisualBasic; ")
+	sb.WriteString("foreach ($p in @(")
+	for i, p := range valid {
+		if i > 0 {
+			sb.WriteString(",")
+		}
+		sb.WriteString("'" + strings.ReplaceAll(p, "'", "''") + "'")
+	}
+	sb.WriteString(")) { if (Test-Path -LiteralPath $p) { ")
+	sb.WriteString("[Microsoft.VisualBasic.FileIO.FileSystem]::DeleteDirectory($p,'OnlyErrorDialogs','SendToRecycleBin') } }")
+	eng, err := pshost.Default()
 	if err != nil {
-		return fmt.Errorf("recycle bin: %w: %s", err, strings.TrimSpace(out))
+		// Engine unavailable: fall back to one-shot spawn.
+		args := []string{"-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", sb.String()}
+		out, err2 := execPowershell(args)
+		if err2 != nil {
+			return fmt.Errorf("recycle bin: %w: %s", err2, strings.TrimSpace(out))
+		}
+	} else if out, runErr := eng.Run(sb.String()); runErr != nil {
+		return fmt.Errorf("recycle bin: %w: %s", runErr, strings.TrimSpace(out))
 	}
 	for _, p := range valid {
 		Logf("recycle", p, 0)
@@ -229,4 +248,16 @@ func HistoryJSON() ([]OpEntry, error) {
 		out = append(out, e)
 	}
 	return out, nil
+}
+
+// RemoveScratch deletes a DEFENESTRATE-owned temporary file (embedded-script
+// copies, spec payloads) written under the OS temp dir by our own code. This
+// is the ONLY sanctioned os.Remove outside the Recycle funnel: it must never
+// be pointed at user data. Callers pass paths they just created themselves.
+func RemoveScratch(path string) error {
+	dir := os.TempDir()
+	if !strings.HasPrefix(path, dir) {
+		return fmt.Errorf("RemoveScratch refused non-temp path %q", path)
+	}
+	return os.Remove(path)
 }
