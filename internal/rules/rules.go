@@ -208,14 +208,22 @@ var Targets = []Target{
 		SkipIfRunning: []string{"GalaxyClient.exe"}, Risk: Low,
 	},
 	devCache("NVIDIA GLShader cache", join(localAppData, "NVIDIA", "GLCache")),
-	devCache("AMD shader caches", join(localAppData, "AMD")),
+	{
+		// AMD: scoped to the three shader-cache dirs. The vendor root also
+		// carries driver installers and Radeon settings state — TrustContents
+		// there would recycle executables (caught by rules_test overscope pin).
+		Category:      "Developer caches",
+		Label:         "AMD shader caches",
+		Path:          join(localAppData, "AMD"),
+		Patterns:      []string{filepath.Join("DxCache"), filepath.Join("DxcCache"), filepath.Join("GLCache")},
+		TrustContents: true,
+		Risk:          Low,
+	},
 	devCache("Intel shader cache", join(localAppData, "Intel", "ShaderCache")),
 	devCache("DirectX D3DSCache", join(localAppData, "D3DSCache")),
 	devCache("pnpm store", join(localAppData, "pnpm", "store")),
-	devCache("Yarn classic cache", join(localAppData, "Yarn", "Cache")),
 	devCache("Bun install cache", join(env("USERPROFILE"), ".bun", "install", "cache")),
 	devCache("node-gyp headers cache", join(localAppData, "node-gyp", "Cache")),
-	devCache("NuGet v3 http cache", join(localAppData, "NuGet", "v3-cache")),
 	devCache("Poetry cache", join(localAppData, "pypoetry", "Cache")),
 	devCache("electron builder cache", join(localAppData, "electron", "Cache")),
 }

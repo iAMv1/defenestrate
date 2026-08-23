@@ -62,6 +62,9 @@ func init() {
 		`${windir}\Logs`,
 		`${windir}\Minidump`,
 		`${windir}\LiveKernelReports`,
+		// Launcher download cache inside the guarded ProgramData root; the
+		// launcher documents full cache regeneration.
+		`${ProgramData}\Battle.net\Agent\cache`,
 	} {
 		if expanded, err := expandEnv(p); err == nil {
 			safeZones = append(safeZones, strings.ToLower(expanded))
