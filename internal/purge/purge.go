@@ -27,26 +27,30 @@ import (
 // Adding coverage = adding a name here. Nothing generic like "build"/"dist"
 // is accepted WITHOUT a project marker in the parent.
 var Artifacts = []string{
-	"node_modules",          // npm/yarn/pnpm — `npm ci` restores
-	"target",                // cargo build output
-	".next",                 // next.js build
-	".nuxt",                 // nuxt build
-	"__pycache__",           // python bytecode
-	".pytest_cache",         // pytest cache
-	".mypy_cache",           // mypy cache
-	".ruff_cache",           // ruff cache
-	"bin",                   // dotnet/go per-project (marker-gated)
-	"obj",                   // dotnet intermediate
-	".gradle",               // gradle project cache
-	"cmake-build-debug",     // clion
-	"cmake-build-release",   // clion
+	"node_modules",        // npm/yarn/pnpm — `npm ci` restores
+	"target",              // cargo build output
+	".next",               // next.js build
+	".nuxt",               // nuxt build
+	"__pycache__",         // python bytecode
+	".pytest_cache",       // pytest cache
+	".mypy_cache",         // mypy cache
+	".ruff_cache",         // ruff cache
+	".parcel-cache",       // parcel bundler cache
+	".turbo",              // turborepo cache
+	".venv",               // python virtualenv (`python -m venv` restores)
+	"dist",                // generic build output (marker-gated)
+	"bin",                 // dotnet/go per-project (marker-gated)
+	"obj",                 // dotnet intermediate
+	".gradle",             // gradle project cache
+	"cmake-build-debug",   // clion
+	"cmake-build-release", // clion
 }
 
 // markers prove a directory is a real project root.
 var markers = []string{
 	".git", "package.json", "go.mod", "Cargo.toml",
 	"pyproject.toml", "requirements.txt", "*.csproj", "*.sln",
-	"pom.xml", "build.gradle",
+	"pom.xml", "build.gradle", "composer.json", "Pipfile", "Gemfile",
 }
 
 const recentDays = 7
